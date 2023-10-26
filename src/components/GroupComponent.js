@@ -1,20 +1,21 @@
 import { Button, Card, InputNumber, Space } from "antd";
 import React, { useEffect, useState } from "react";
+import { connect } from 'react-redux';
+import { useDispatch } from "react-redux";
+import { UpdateGroups } from '../Redux/action';
 
-const GroupComponent = () => {
-  const [groups, setGroups] = useState([
-    { from: 1, to: 10, showCard: false, todos:[] },
-  ]);
+const GroupComponent = ({ newgroups }) => {
   const [loading, setLoading] = useState(false);
   const [isAllGroupsValid, setAllGroupsValid] = useState(true)
+  const dispatch = useDispatch()
 
   const addGroup = () => {
     const newObj = {
       from:  "",
       to: "",
-      showCard: false,
+      todos: []
     };
-    setGroups((prev) => [...prev, newObj]);
+    dispatch(UpdateGroups([...newgroups, newObj]))
   };
 
   const handlValueChange = (value, index, name) => {
@@ -31,31 +32,29 @@ const GroupComponent = () => {
       default:
         console.log(name, "from switch case");
         if(index !== 0){
-          groups[index - 1].to = value - 1;
+          newgroups[index - 1].to = value - 1;
         }
         break;
     }
-    const updatedGroups = [...groups];
+    const updatedGroups = [...newgroups];
     updatedGroups[index][name] = newValue;
-    setGroups(updatedGroups);
+    dispatch(UpdateGroups(updatedGroups))
   };
   const getDataFromApi = async (from, to) =>{
-    const dataFromApi = [];
-    for(let index = from; index <= to; index++){
-      await fetch(`https://jsonplaceholder.typicode.com/todos/${index}`).then(result =>{
+    let dataFromApi = [];
+      await fetch(`https://jsonplaceholder.typicode.com/todos?_start=${from - 1}&_end=${to}`).then(result =>{
           return result.json();
         }).then(data => {
-          dataFromApi.push(data)
+          dataFromApi = [...data]
         }).catch(err => console.log(err, "############33"))
-    }
+    // }
     setLoading(false)
     return dataFromApi;
 
   }
 
   const checking = () => {
-    groups.forEach(group =>{
-      console.log("from each group", group)
+    newgroups.forEach(group =>{
       if(group.from === "" || group.to === "") {
         setAllGroupsValid(false);
         return;
@@ -67,38 +66,37 @@ const GroupComponent = () => {
 
   useEffect(() =>{
     checking()
-  }, [groups])
+  }, [newgroups])
   
   const showAllStatus = () => {
     setLoading(true);
-    const updatedGroups = [...groups];
-    groups.forEach(async (_val, index) => {
+    const updatedGroups = [...newgroups];
+    updatedGroups.forEach(async (_val, index) => {
       updatedGroups[index].showCard = !updatedGroups[index].showCard;
       const todosForRange = await getDataFromApi(_val.from, _val.to);
       updatedGroups[index].todos = [...todosForRange];
       
     });
-    setGroups(updatedGroups);
-
+    dispatch(UpdateGroups(updatedGroups))
   };
 
   const deleteGroup = (index) => {
 
-    let updatedGroups = [...groups];
+    let updatedGroups = [...newgroups];
     if(index === 0){
-      groups[1].from = groups[0].from
+      newgroups[1].from = newgroups[0].from
     }else {
-      groups[index - 1].to = groups[index].to
+      newgroups[index - 1].to = newgroups[index].to
     }
     updatedGroups.splice(index, 1);
-    setGroups(updatedGroups);
+    dispatch(UpdateGroups(updatedGroups))    
   };
   return (
     <>
-      {groups?.map((element, index) => (
+      {newgroups?.map((element, index) => (
         <div>
           <Button
-            disabled={groups.length === 1}
+            disabled={newgroups.length === 1}
             onClick={() => {
               deleteGroup(index);
             }}
@@ -108,33 +106,32 @@ const GroupComponent = () => {
           Group {index + 1}
           <Space direction="horizontal">
             <InputNumber
-              min={index === 0 ? 1 : groups[index - 1].from + 1}
+              min={index === 0 ? 1 : newgroups[index - 1]?.from + 1}
               max={10}
               addonBefore={"From"}
-              value={element.from}
+              value={element?.from}
               onChange={(value) => {
                 handlValueChange(value, index, "from");
               }}
             />
             <InputNumber
               addonBefore="To"
-              min={element.from}
+              min={element?.from}
               max={10}
-              value={element.to}
+              value={element?.to}
               onChange={(value) => {
                 handlValueChange(value, index, "to");
               }}
             />
             {loading ? <>loading ...</>:element.showCard && (
               <Card>
-                {element.todos.map((val, index) => {
-                  return  (index >= element.from - 1) && (index < element.to) ?(
-                    <>
+                {element.todos?.map((val) => {
+                  return  <>
                       <span>
                         {val.id} {String(val.completed)}{" "}
                       </span>
                     </>
-                  ): null
+                  
                 })}
               </Card>
             )}
@@ -142,7 +139,7 @@ const GroupComponent = () => {
         </div>
       ))}
       <Button
-        disabled={groups.length > 9}
+        disabled={newgroups.length > 9}
         onClick={() => {
           addGroup();
         }}
@@ -155,10 +152,19 @@ const GroupComponent = () => {
           showAllStatus();
         }}
       >
-        {groups[0].showCard ?"hide status":"Show Status"}
+        {newgroups[0].showCard ?"hide status":"Show Status"}
       </Button>
     </>
   );
 };
 
-export default GroupComponent;
+
+const mapStateToProps = (state) => {
+  return {
+    newgroups: state.groups
+
+  };
+};
+
+
+export default connect(mapStateToProps)(GroupComponent);
